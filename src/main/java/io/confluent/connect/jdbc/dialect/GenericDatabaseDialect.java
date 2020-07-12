@@ -129,6 +129,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
    */
   protected final NumericMapping mapNumerics;
   protected String catalogPattern;
+  protected Set<String> tablePatterns;
   protected final String schemaPattern;
   protected final Set<String> tableTypes;
   protected final String jdbcUrl;
@@ -166,9 +167,10 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     this.jdbcUrl = config.getString(JdbcSourceConnectorConfig.CONNECTION_URL_CONFIG);
     this.jdbcUrlInfo = DatabaseDialects.extractJdbcUrlInfo(jdbcUrl);
     if (config instanceof JdbcSinkConfig) {
-      JdbcSinkConfig sinkConfig = (JdbcSinkConfig) config;
       catalogPattern = JdbcSourceTaskConfig.CATALOG_PATTERN_DEFAULT;
       schemaPattern = JdbcSourceTaskConfig.SCHEMA_PATTERN_DEFAULT;
+      tablePatterns = new HashSet<>();
+      JdbcSinkConfig sinkConfig = (JdbcSinkConfig) config;
       tableTypes = sinkConfig.tableTypeNames();
       quoteSqlIdentifiers = QuoteMethod.get(
           config.getString(JdbcSinkConfig.QUOTE_SQL_IDENTIFIERS_CONFIG)
@@ -176,6 +178,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     } else {
       catalogPattern = config.getString(JdbcSourceTaskConfig.CATALOG_PATTERN_CONFIG);
       schemaPattern = config.getString(JdbcSourceTaskConfig.SCHEMA_PATTERN_CONFIG);
+      tablePatterns = new HashSet<>(config.getList(JdbcSourceTaskConfig.TABLE_PATTERNS_CONFIG));
       tableTypes = new HashSet<>(config.getList(JdbcSourceTaskConfig.TABLE_TYPE_CONFIG));
       quoteSqlIdentifiers = QuoteMethod.get(
           config.getString(JdbcSourceConnectorConfig.QUOTE_SQL_IDENTIFIERS_CONFIG)
@@ -388,20 +391,23 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     String tableTypeDisplay = displayableTableTypes(tableTypes, ", ");
     log.debug("Using {} dialect to get {}", this, tableTypeDisplay);
 
-    try (ResultSet rs = metadata.getTables(catalogPattern(), schemaPattern(), "%", tableTypes)) {
-      List<TableId> tableIds = new ArrayList<>();
-      while (rs.next()) {
-        String catalogName = rs.getString(1);
-        String schemaName = rs.getString(2);
-        String tableName = rs.getString(3);
-        TableId tableId = new TableId(catalogName, schemaName, tableName);
-        if (includeTable(tableId)) {
-          tableIds.add(tableId);
+    List<TableId> tableIds = new ArrayList<>();
+    for (String tablePatternItem : tablePatterns()) {
+      try (ResultSet rs = metadata
+            .getTables(catalogPattern(), schemaPattern(), tablePatternItem, tableTypes)) {
+        while (rs.next()) {
+          String catalogName = rs.getString(1);
+          String schemaName = rs.getString(2);
+          String tableName = rs.getString(3);
+          TableId tableId = new TableId(catalogName, schemaName, tableName);
+          if (includeTable(tableId)) {
+            tableIds.add(tableId);
+          }
         }
       }
-      log.debug("Used {} dialect to find {} {}", this, tableIds.size(), tableTypeDisplay);
-      return tableIds;
     }
+    log.debug("Used {} dialect to find {} {}", this, tableIds.size(), tableTypeDisplay);
+    return tableIds;
   }
 
   protected String catalogPattern() {
@@ -410,6 +416,10 @@ public class GenericDatabaseDialect implements DatabaseDialect {
 
   protected String schemaPattern() {
     return schemaPattern;
+  }
+
+  protected Set<String> tablePatterns() {
+    return tablePatterns;
   }
 
   /**

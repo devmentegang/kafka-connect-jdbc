@@ -224,6 +224,14 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
   private static final String CATALOG_PATTERN_DISPLAY = "Schema pattern";
   public static final String CATALOG_PATTERN_DEFAULT = null;
 
+  public static final String TABLE_PATTERNS_CONFIG = "table.patterns";
+  private static final String TABLE_PATTERNS_DOC =
+      "Table patterns to fetch table metadata from the database.\n"
+      + "  * ``\"%\"`` (default) indicates that the table name is not used to narrow the "
+        + "search and that all table metadata is fetched, regardless of the catalog.";
+  private static final String TABLE_PATTERNS_DISPLAY = "Table patterns";
+  public static final String TABLE_PATTERNS_DEFAULT = "%";
+
   public static final String QUERY_CONFIG = "query";
   private static final String QUERY_DOC =
       "If specified, the query to perform to select new or updated rows. Use this setting if you "
@@ -396,6 +404,16 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         Width.LONG,
         TABLE_BLACKLIST_DISPLAY,
         TABLE_RECOMMENDER
+    ).define(
+        TABLE_PATTERNS_CONFIG,
+        Type.LIST,
+        TABLE_PATTERNS_DEFAULT,
+        Importance.MEDIUM,
+        TABLE_PATTERNS_DOC,
+        DATABASE_GROUP,
+        ++orderInGroup,
+        Width.SHORT,
+        TABLE_PATTERNS_DISPLAY
     ).define(
         CATALOG_PATTERN_CONFIG,
         Type.STRING,
